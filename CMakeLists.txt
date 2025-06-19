@@ -22,6 +22,7 @@ FetchContent_MakeAvailable(raylib)
 add_executable(stillness
     main.cpp
     Camera.cpp
+    CubeMesh.cpp
 )
 
 # Always copy resources before building the executable
