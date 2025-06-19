@@ -1,9 +1,10 @@
 #include <iostream>
 #include <raylib.h>
 #include <rlgl.h>
+#include <raymath.h>
+#include "Camera.h"
 
-#include "raymath.h"
-
+// Function to generate a cube mesh with vertex positions and normals
 Mesh GenerateCubeMesh()
 {
     Mesh mesh = { 0 };
@@ -135,27 +136,10 @@ int main() {
 
     InitWindow(screenWidth, screenHeight, "Stillness");
 
-    // Define camera
-    Camera3D camera;
-    camera.position = { 0.0f, 2.5f, 5.0f }; // Camera position
-    camera.target = { 0.0f, 0.0f, 0.0f };
-    camera.up = { 0.0f, 1.0f, 0.0f };
-    camera.fovy = 45.0f;
-    camera.projection = CAMERA_PERSPECTIVE;
-
-    // Camera movement settings
-    float cameraSpeed = 0.1f;
-    float mouseSensitivity = 0.1f;
-    Vector2 previousMousePosition = { 0 };
-    Vector2 mousePosition = { 0 };
-
-    // Define light position in world space
-    Vector3 lightPos = { 3.0f, 2.0f, 3.0f };
-    float lightMovementRadius = 4.0f;
-    float lightMovementSpeed = 1.0f;
-
-    // Disable cursor for camera look control
-    DisableCursor();
+    // Create our camera
+    GameCamera camera(0.0f, 2.5f, 5.0f);
+    camera.SetMovementSpeed(0.1f);
+    camera.SetMouseSensitivity(0.1f);
 
     SetTargetFPS(120);
 
@@ -173,87 +157,14 @@ int main() {
     material.shader = shader;
     material.maps[MATERIAL_MAP_DIFFUSE].color = RED;
 
+    // Define light position in world space
+    Vector3 lightPos = { 3.0f, 2.0f, 3.0f };
+    float lightMovementRadius = 4.0f;
+    float lightMovementSpeed = 1.0f;
+
     while (!WindowShouldClose()) {
-        // Update camera position with WASD keys
-        Vector3 forward = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
-        Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camera.up));
-
-        // Scale movement based on frame time for consistent speed
-        float frameTime = GetFrameTime();
-        float moveSpeed = cameraSpeed * frameTime * 60.0f;
-
-        // Forward/backward movement
-        if (IsKeyDown(KEY_W)) {
-            camera.position = Vector3Add(camera.position, Vector3Scale(forward, moveSpeed));
-            camera.target = Vector3Add(camera.target, Vector3Scale(forward, moveSpeed));
-        }
-        if (IsKeyDown(KEY_S)) {
-            camera.position = Vector3Subtract(camera.position, Vector3Scale(forward, moveSpeed));
-            camera.target = Vector3Subtract(camera.target, Vector3Scale(forward, moveSpeed));
-        }
-
-        // Left/right movement
-        if (IsKeyDown(KEY_A)) {
-            camera.position = Vector3Subtract(camera.position, Vector3Scale(right, moveSpeed));
-            camera.target = Vector3Subtract(camera.target, Vector3Scale(right, moveSpeed));
-        }
-        if (IsKeyDown(KEY_D)) {
-            camera.position = Vector3Add(camera.position, Vector3Scale(right, moveSpeed));
-            camera.target = Vector3Add(camera.target, Vector3Scale(right, moveSpeed));
-        }
-
-        // Mouse look control
-        mousePosition = GetMousePosition();
-
-        if (previousMousePosition.x != 0 || previousMousePosition.y != 0)
-        {
-            // Calculate mouse delta
-            float deltaX = mousePosition.x - previousMousePosition.x;
-            float deltaY = mousePosition.y - previousMousePosition.y;
-
-            // Apply yaw rotation (horizontal look)
-            if (deltaX != 0) {
-                // Rotate around up vector
-                Vector3 toTarget = Vector3Subtract(camera.target, camera.position);
-                toTarget = Vector3RotateByAxisAngle(toTarget, camera.up, -deltaX * mouseSensitivity * DEG2RAD);
-                camera.target = Vector3Add(camera.position, toTarget);
-            }
-
-            // Apply pitch rotation (vertical look)
-            if (deltaY != 0) {
-                // Rotate around right vector
-                Vector3 toTarget = Vector3Subtract(camera.target, camera.position);
-                Vector3 newTarget = Vector3RotateByAxisAngle(toTarget, right, -deltaY * mouseSensitivity * DEG2RAD);
-
-                // Calculate angle to avoid over-rotation (prevent camera flipping)
-                float angle = Vector3Angle(newTarget, camera.up);
-                if (angle > 0.1f && angle < PI - 0.1f) {
-                    camera.target = Vector3Add(camera.position, newTarget);
-                }
-            }
-        }
-
-        // Reset mouse position to center if it's at screen edge
-        Vector2 screenCenter = { screenWidth/2.0f, screenHeight/2.0f };
-        if (mousePosition.x < 50 || mousePosition.x > screenWidth - 50 ||
-            mousePosition.y < 50 || mousePosition.y > screenHeight - 50) {
-            SetMousePosition(screenCenter.x, screenCenter.y);
-            mousePosition = screenCenter;
-        }
-        previousMousePosition = mousePosition;
-
-        // Press SPACE to reset camera
-        if (IsKeyPressed(KEY_SPACE)) {
-            camera.position = { 0.0f, 2.5f, 5.0f };
-            camera.target = { 0.0f, 0.0f, 0.0f };
-            camera.up = { 0.0f, 1.0f, 0.0f };
-        }
-
-        // Toggle cursor visibility with ESCAPE key
-        if (IsKeyPressed(KEY_ESCAPE)) {
-            if (IsCursorHidden()) EnableCursor();
-            else DisableCursor();
-        }
+        // Update camera
+        camera.Update();
 
         // Move light in a circular pattern (orbit around Y axis)
         float time = GetTime() * lightMovementSpeed;
@@ -267,9 +178,9 @@ int main() {
 
         ClearBackground(RAYWHITE);
 
-        BeginMode3D(camera);
+        BeginMode3D(camera.GetCamera());
 
-        // Create model matrix for the cube (identity matrix for now)
+        // Create model matrix for the cube
         Matrix modelMatrix = MatrixIdentity();
 
         // Set the model matrix uniform for proper normal transformation
@@ -291,6 +202,9 @@ int main() {
         DrawText("WASD to move, Mouse to look", 10, 10, 20, BLACK);
         DrawText("SPACE to reset camera, ESC to toggle cursor", 10, 40, 20, BLACK);
         DrawText(TextFormat("Light position: %.2f, %.2f, %.2f", lightPos.x, lightPos.y, lightPos.z), 10, 70, 20, BLACK);
+
+        // Display FPS counter in the top-right corner
+        DrawFPS(screenWidth - 100, 10);
 
         EndDrawing();
     }

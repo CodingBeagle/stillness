@@ -19,7 +19,10 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(raylib)
 
 # Stillness Project
-add_executable(stillness main.cpp)
+add_executable(stillness
+    main.cpp
+    Camera.cpp
+)
 
 # Always copy resources before building the executable
 add_custom_target(copy_resources ALL
