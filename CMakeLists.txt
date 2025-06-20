@@ -23,6 +23,7 @@ add_executable(stillness
     main.cpp
     Camera.cpp
     CubeMesh.cpp
+    MarchingCubes.cpp
 )
 
 # Always copy resources before building the executable

@@ -1,8 +1,39 @@
 #include <iostream>
+#include <memory>
+
 #include <raylib.h>
 #include <raymath.h>
+
 #include "Camera.h"
 #include "CubeMesh.h"
+#include "MarchingCubes.h"
+
+// Function to create a standard cube GridCell centered at the origin
+GridCell CreateStandardCube(float size = 1.0f) {
+    GridCell cell;
+
+    // Define the 8 vertices of a cube
+    // Vertex ordering follows standard convention for marching cubes
+    // Bottom face vertices (y = -0.5)
+    cell.vertices[0] = {-size/2, -size/2, -size/2}; // Bottom-left-back
+    cell.vertices[1] = { size/2, -size/2, -size/2}; // Bottom-right-back
+    cell.vertices[2] = { size/2, -size/2,  size/2}; // Bottom-right-front
+    cell.vertices[3] = {-size/2, -size/2,  size/2}; // Bottom-left-front
+
+    // Top face vertices (y = 0.5)
+    cell.vertices[4] = {-size/2,  size/2, -size/2}; // Top-left-back
+    cell.vertices[5] = { size/2,  size/2, -size/2}; // Top-right-back
+    cell.vertices[6] = { size/2,  size/2,  size/2}; // Top-right-front
+    cell.vertices[7] = {-size/2,  size/2,  size/2}; // Top-left-front
+
+    // Initialize densities to 0.0
+    // You'll need to set these values based on your specific application
+    for (int i = 0; i < 8; i++) {
+        cell.densities[i] = 1.0;
+    }
+
+    return cell;
+}
 
 int main() {
     const int screenWidth = 2560;
@@ -18,6 +49,8 @@ int main() {
     SetTargetFPS(120);
 
     // Load custom shaders
+    // When calling LoadShader, Raylib will automatically attempt to find the location of uniforms and inputs with standard names.
+    // Such as "matModel", "matView", "mvp", etc.
     Shader shader = LoadShader("resources/shaders/default.vert", "resources/shaders/default.frag");
 
     // Get shader locations
@@ -31,8 +64,76 @@ int main() {
     material.shader = shader;
     material.maps[MATERIAL_MAP_DIFFUSE].color = RED;
 
+    // Initialize marching cubes algorithm
+    std::unique_ptr<MarchingCubes> marchingCubes = std::make_unique<MarchingCubes>();
+
+    // Create a standard cube with size 2.0
+    GridCell gridCell = CreateStandardCube(2.0f);
+
+    // Set up some density values for the cube vertices
+    // This will create a simple diagonal cut through the cube
+    gridCell.densities[0] = 0.0;  // Inside the surface
+    gridCell.densities[1] = 0.0;  // Inside the surface
+
+    // Set the isolevel for surface extraction (adjust this to see different results)
+    double isoLevel = 0.99;
+
+    // Generate triangles using the marching cubes algorithm
+    std::vector<Triangle> triangles = marchingCubes->Polygonise(gridCell, isoLevel);
+
+    // Create a Raylib mesh from the triangles
+    Mesh gridCellMesh = { 0 };
+
+    if (!triangles.empty()) {
+        // Count the total number of vertices
+        int numVertices = triangles.size() * 3;
+
+        // Allocate memory for the mesh
+        gridCellMesh.vertexCount = numVertices;
+        gridCellMesh.triangleCount = triangles.size();
+        gridCellMesh.vertices = (float*)MemAlloc(numVertices * 3 * sizeof(float));
+        gridCellMesh.normals = (float*)MemAlloc(numVertices * 3 * sizeof(float));
+
+        // Fill the mesh data
+        for (int i = 0; i < triangles.size(); i++) {
+            // Vertices for this triangle
+            Vector3 v1 = triangles[i].X;
+            Vector3 v2 = triangles[i].Y;
+            Vector3 v3 = triangles[i].Z;
+
+            // Calculate normal (counter-clockwise winding)
+            Vector3 normal = Vector3Normalize(Vector3CrossProduct(
+                Vector3Subtract(v2, v1),
+                Vector3Subtract(v3, v1)
+            ));
+
+            // Copy vertex positions
+            gridCellMesh.vertices[i*9 + 0] = v1.x;
+            gridCellMesh.vertices[i*9 + 1] = v1.y;
+            gridCellMesh.vertices[i*9 + 2] = v1.z;
+
+            gridCellMesh.vertices[i*9 + 3] = v2.x;
+            gridCellMesh.vertices[i*9 + 4] = v2.y;
+            gridCellMesh.vertices[i*9 + 5] = v2.z;
+
+            gridCellMesh.vertices[i*9 + 6] = v3.x;
+            gridCellMesh.vertices[i*9 + 7] = v3.y;
+            gridCellMesh.vertices[i*9 + 8] = v3.z;
+
+            // Use the same normal for all vertices in this triangle
+            for (int j = 0; j < 3; j++) {
+                gridCellMesh.normals[i*9 + j*3 + 0] = normal.x;
+                gridCellMesh.normals[i*9 + j*3 + 1] = normal.y;
+                gridCellMesh.normals[i*9 + j*3 + 2] = normal.z;
+            }
+        }
+
+        // Upload mesh data to GPU
+        UploadMesh(&gridCellMesh, false);
+    }
+
     // Define light position in world space
-    Vector3 lightPos = { 50.0f, 25.0f, 20.0f };
+    Vector3 lightPos = {50.0f, 25.0f, 20.0f};
 
     while (!WindowShouldClose()) {
         // Update camera
@@ -54,8 +155,10 @@ int main() {
         int modelLoc = GetShaderLocation(shader, "matModel");
         SetShaderValueMatrix(shader, modelLoc, modelMatrix);
 
-        // Draw the cube using our custom mesh and material
-        DrawMesh(cube, material, modelMatrix);
+        // Draw the generated marching cubes mesh (if it exists)
+        if (gridCellMesh.vertexCount > 0) {
+            DrawMesh(gridCellMesh, material, modelMatrix);
+        }
 
         // Draw a grid to help with orientation
         DrawGrid(100, 1.0f);
@@ -77,13 +180,16 @@ int main() {
     }
 
     // Unload resources - fix the order of deallocation
-    // First, unload the mesh
+    // First, unload the meshes
     UnloadMesh(cube);
+    if (gridCellMesh.vertexCount > 0) {
+        UnloadMesh(gridCellMesh);
+    }
 
     // Then unload material but don't unload the shader through the material
     // Create a copy of the material to unload, with shader set to NULL
     Material tempMaterial = material;
-    tempMaterial.shader = { 0 }; // Clear the shader reference in the material
+    tempMaterial.shader = {0}; // Clear the shader reference in the material
     UnloadMaterial(tempMaterial);
 
     // Finally, unload the shader separately
