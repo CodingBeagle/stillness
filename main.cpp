@@ -163,6 +163,7 @@ int main() {
         // Draw a grid to help with orientation
         DrawGrid(100, 1.0f);
 
+
         // Draw a small sphere at the light position for visual reference
         DrawSphere(lightPos, 0.2f, YELLOW);
 
