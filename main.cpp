@@ -32,18 +32,11 @@ int main() {
     material.maps[MATERIAL_MAP_DIFFUSE].color = RED;
 
     // Define light position in world space
-    Vector3 lightPos = { 3.0f, 2.0f, 3.0f };
-    float lightMovementRadius = 4.0f;
-    float lightMovementSpeed = 1.0f;
+    Vector3 lightPos = { 50.0f, 25.0f, 20.0f };
 
     while (!WindowShouldClose()) {
         // Update camera
         camera.Update();
-
-        // Move light in a circular pattern (orbit around Y axis)
-        float time = GetTime() * lightMovementSpeed;
-        lightPos.x = cosf(time) * lightMovementRadius;
-        lightPos.z = sinf(time) * lightMovementRadius;
 
         // Update light position uniform in shader
         SetShaderValue(shader, lightPosLoc, &lightPos, SHADER_UNIFORM_VEC3);

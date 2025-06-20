@@ -13,6 +13,7 @@ GameCamera::GameCamera(float posX, float posY, float posZ) {
     // Initialize control variables
     moveSpeed = 0.1f;
     mouseSensitivity = 0.1f;
+    sprintMultiplier = 2.5f;  // Sprint is 2.5x faster than normal speed
     cursorEnabled = false;
 
     // Calculate screen center
@@ -93,6 +94,27 @@ void GameCamera::UpdateMovement(float deltaTime) {
     if (IsKeyDown(KEY_D)) {
         camera.position = Vector3Add(camera.position, Vector3Scale(right, speed));
         camera.target = Vector3Add(camera.target, Vector3Scale(right, speed));
+    }
+
+    // Sprinting
+    if (IsKeyDown(KEY_LEFT_SHIFT)) {
+        float sprintSpeed = moveSpeed * sprintMultiplier * deltaTime * 60.0f;
+        if (IsKeyDown(KEY_W)) {
+            camera.position = Vector3Add(camera.position, Vector3Scale(forward, sprintSpeed));
+            camera.target = Vector3Add(camera.target, Vector3Scale(forward, sprintSpeed));
+        }
+        if (IsKeyDown(KEY_S)) {
+            camera.position = Vector3Subtract(camera.position, Vector3Scale(forward, sprintSpeed));
+            camera.target = Vector3Subtract(camera.target, Vector3Scale(forward, sprintSpeed));
+        }
+        if (IsKeyDown(KEY_A)) {
+            camera.position = Vector3Subtract(camera.position, Vector3Scale(right, sprintSpeed));
+            camera.target = Vector3Subtract(camera.target, Vector3Scale(right, sprintSpeed));
+        }
+        if (IsKeyDown(KEY_D)) {
+            camera.position = Vector3Add(camera.position, Vector3Scale(right, sprintSpeed));
+            camera.target = Vector3Add(camera.target, Vector3Scale(right, sprintSpeed));
+        }
     }
 }
 

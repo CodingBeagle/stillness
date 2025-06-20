@@ -26,12 +26,14 @@ public:
     // Configuration settings
     void SetMovementSpeed(float speed) { moveSpeed = speed; }
     void SetMouseSensitivity(float sensitivity) { mouseSensitivity = sensitivity; }
+    void SetSprintMultiplier(float multiplier) { sprintMultiplier = multiplier; }
 
 private:
     Camera3D camera;            // Internal Raylib camera
     bool cursorEnabled;         // Is cursor enabled
     float moveSpeed;            // Movement speed
     float mouseSensitivity;     // Mouse look sensitivity
+    float sprintMultiplier;     // Sprint speed multiplier
     Vector2 previousMousePos;   // Previous mouse position for delta calculation
     Vector2 screenCenter;       // Center of the screen
 };
